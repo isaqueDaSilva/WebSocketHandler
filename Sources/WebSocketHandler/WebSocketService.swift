@@ -39,7 +39,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Starts the WebSocket channel
     /// - Parameter initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    public mutating func run<M: Codable>(with initialMessage: M) async throws {
+    public mutating func start<M: Codable>(with initialMessage: M) async throws {
         self.wsUpgrader = try await getUpgraderResult()
         
         guard let wsUpgrader else { return }
