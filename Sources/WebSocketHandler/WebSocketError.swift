@@ -8,12 +8,12 @@
 import Foundation
 
 extension WebSocketService: Error, LocalizedError {
-    enum WebSocketError: Error, LocalizedError, Sendable {
+    public enum WebSocketError: Error, LocalizedError, Sendable {
         case decodingError
         case noConnection
         case unknownError(Error)
         
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .decodingError:
                 NSLocalizedString("Failed to decode a data coming from the channel.", comment: "")

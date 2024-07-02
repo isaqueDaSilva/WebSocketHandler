@@ -39,7 +39,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Starts the WebSocket channel
     /// - Parameter initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    mutating func run<M: Codable>(with initialMessage: M) async throws {
+    public mutating func run<M: Codable>(with initialMessage: M) async throws {
         self.wsUpgrader = try await getUpgraderResult()
         
         guard let wsUpgrader else { return }
@@ -165,7 +165,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Disconnect the active channel.
     /// - Parameter closeMode: What kind of close operation is requested.
-    func disconnect(with closeMode: CloseMode = .all) async throws {
+    public func disconnect(with closeMode: CloseMode = .all) async throws {
         guard let wsUpgrader else { return }
         
         switch try await wsUpgrader.get() {
@@ -182,7 +182,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     }
     
     /// Sends a ping frame for the WebSocket channel.
-    func sendPing() async throws {
+    public func sendPing() async throws {
         let pingFrame = WebSocketFrame(fin: true, opcode: .ping, data: .init(string: "I'm here."))
         
         guard let wsUpgrader else { return }
@@ -205,7 +205,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Sends a message for the WebSocket channel
     /// - Parameter message: The message data representation for send to the channel.
-    func send(_ message: Data) async throws {
+    public func send(_ message: Data) async throws {
         let messageByte = [UInt8](message)
         let messageFrame = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: messageByte))
         
