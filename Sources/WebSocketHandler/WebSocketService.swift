@@ -33,7 +33,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// A default WebSocket Upgrader for this aplication.
     private var wsUpgrader: EventLoopFuture<UpgradeResult>?
     
-    /// The default Combine's subject that stores the current message or an error to send back to the top level aplication.
+    /// The default Combine's subject that stores the current message or an error to send back to the top level aplication..
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
     
