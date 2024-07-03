@@ -33,13 +33,21 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// A default WebSocket Upgrader for this aplication.
     private var wsUpgrader: EventLoopFuture<UpgradeResult>?
     
+    private var outboundWriter: NIOAsyncChannelOutboundWriter<WebSocketFrame>?
+    
     /// The default Combine's subject that stores the current message or an error to send back to the top level aplication.
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
     
     /// Starts the WebSocket channel
-    public mutating func start() async throws {
+    public mutating func start<M: Codable>(with initialMessage: M) async throws {
         self.wsUpgrader = try await getUpgraderResult()
+        
+        guard let wsUpgrader else {
+            return try await disconnect()
+        }
+        
+        try await channelUpgradeResult(with: wsUpgrader, and: initialMessage)
     }
     
     /// Establish the WebSoclet channel connection
@@ -97,16 +105,14 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    public func channelUpgradeResult<M: Codable>(
-        with initialMessage: M
+    private mutating func channelUpgradeResult<M: Codable>(
+        with upgrader: EventLoopFuture<UpgradeResult>,
+        and initialMessage: M
     ) async throws {
-        guard let wsUpgrader else { return }
-        
-        switch try await wsUpgrader.get() {
+        switch try await upgrader.get() {
         case .websocket(let wsChannel):
             print("Handling websocket connection")
             try await handleWebsocketChannel(wsChannel, and: initialMessage)
-            try await receiveValues(with: wsChannel)
             print("Done handling websocket connection")
         case .notUpgraded:
             print("Upgrade declined")
@@ -117,7 +123,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - channel: The actual WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private func handleWebsocketChannel<M: Codable>(
+    private mutating func handleWebsocketChannel<M: Codable>(
         _ channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
         and initialMessage: M
     ) async throws {
@@ -131,16 +137,16 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         let message = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: [UInt8](modelData)))
         
         // Executes the channel.
-        try await channel.executeThenClose { _, outbound in
-            // Sends the initial message for the channel.
-            try await outbound.write(message)
-        }
-    }
-    
-    private func receiveValues(
-        with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
-    ) async throws {
         try await channel.executeThenClose { inbound, outbound in
+            // Sends the initial message for the channel.
+            self.outboundWriter = outbound
+            
+            guard let outboundWriter else {
+                try await disconnect()
+                return
+            }
+            
+            try await outboundWriter.write(message)
             
             // Creates a stream for receive
             // the all data that coming
@@ -173,13 +179,15 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Disconnect the active channel.
     /// - Parameter closeMode: What kind of close operation is requested.
-    public func disconnect(with closeMode: CloseMode = .all) async throws {
+    public mutating func disconnect(with closeMode: CloseMode = .all) async throws {
         guard let wsUpgrader else { return }
         
         switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
             do {
                 try await wsChannel.channel.close(mode: closeMode)
+                self.wsUpgrader = nil
+                self.outboundWriter = nil
             } catch {
                 messageReceivedSubject.send(completion: .failure(.unknownError(error)))
             }
@@ -219,17 +227,9 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         
         guard let wsUpgrader else { throw WebSocketError.noConnection }
         
-        let channel = try await wsUpgrader.get()
+        guard let outboundWriter else { return }
         
-        switch channel {
-        case .websocket(let wsChannel):
-            try await wsChannel.executeThenClose { inbound, outbound in
-                try await outbound.write(messageFrame)
-                
-            }
-        case .notUpgraded:
-            throw WebSocketError.noConnection
-        }
+        try await outboundWriter.write(messageFrame)
     }
     
     public init(
