@@ -25,7 +25,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     private let uri: String
     
     /// The authorization value for establish connection with the ws server.
-    private let authorizationValue: String
+    private let authorizationValue: String?
     
     /// A default event loop group for this aplication.
     private let eventLoopGroup: MultiThreadedEventLoopGroup
@@ -38,13 +38,8 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     
     /// Starts the WebSocket channel
-    /// - Parameter initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    public mutating func start<M: Codable>(with initialMessage: M) async throws {
+    public mutating func start() async throws {
         self.wsUpgrader = try await getUpgraderResult()
-        
-        guard let wsUpgrader else { return }
-        
-        try await handleUpgradeResult(with: wsUpgrader, and: initialMessage)
     }
     
     /// Establish the WebSoclet channel connection
@@ -64,7 +59,11 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                     }
                     
                     var header = HTTPHeaders()
-                    header.add(name: "Authorization", value: authorizationValue)
+                    
+                    if let authorizationValue {
+                        header.add(name: "Authorization", value: authorizationValue)
+                    }
+                    
                     header.add(name: "Content-Type", value: "application/vnd.api+json")
                     
                     let requestHead = HTTPRequestHead(
@@ -98,11 +97,12 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private func handleUpgradeResult<M: Codable>(
-        with upgradeResult: EventLoopFuture<UpgradeResult>,
+    public func handleUpgradeResult<M: Codable>(
         and initialMessage: M
     ) async throws {
-        switch try await upgradeResult.get() {
+        guard let wsUpgrader else { return }
+        
+        switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
             print("Handling websocket connection")
             try await handleWebsocketChannel(wsChannel, and: initialMessage)
@@ -227,7 +227,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         host: String,
         port: Int,
         uri: String,
-        authorizationValue: String,
+        authorizationValue: String? = nil,
         eventLoopGroup: MultiThreadedEventLoopGroup = .singleton
     ) {
         self.host = host
