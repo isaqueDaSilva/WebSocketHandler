@@ -13,6 +13,7 @@ extension WebSocketService: Error, LocalizedError {
         case decodingError
         case noConnection
         case unknownError(Error)
+        case dataNotSuported
         
         public var errorDescription: String? {
             switch self {
@@ -22,6 +23,8 @@ extension WebSocketService: Error, LocalizedError {
                 NSLocalizedString("They are no connections available to handle with this task.", comment: "")
             case .unknownError(let error):
                 NSLocalizedString("An unexpected error occur. Error: \(error.localizedDescription)", comment: "")
+            case .dataNotSuported:
+                NSLocalizedString("An unexpected data type was received.", comment: "")
             }
         }
     }

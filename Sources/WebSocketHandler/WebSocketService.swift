@@ -33,8 +33,6 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// A default WebSocket Upgrader for this aplication.
     private var wsUpgrader: EventLoopFuture<UpgradeResult>?
     
-    private var outboundWriter: NIOAsyncChannelOutboundWriter<WebSocketFrame>?
-    
     /// The default Combine's subject that stores the current message or an error to send back to the top level aplication.
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
@@ -139,26 +137,16 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         // Executes the channel.
         try await channel.executeThenClose { inbound, outbound in
             // Sends the initial message for the channel.
-            self.outboundWriter = outbound
             
-            guard let outboundWriter else {
-                try await disconnect()
-                return
-            }
-            
-            try await outboundWriter.write(message)
+            try await outbound.write(message)
             
             // Creates a stream for receive
             // the all data that coming
             // from the WebSocket channel.
             for try await frame in inbound {
                 switch frame.opcode {
-                case .pong:
-                    print("Pong Received: \(String(buffer: frame.data))")
                 case .binary:
                     onReceive(frame.data)
-                case .connectionClose:
-                    try await disconnect()
                 default:
                     break
                 }
@@ -187,7 +175,6 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
             do {
                 try await wsChannel.channel.close(mode: closeMode)
                 self.wsUpgrader = nil
-                self.outboundWriter = nil
             } catch {
                 messageReceivedSubject.send(completion: .failure(.unknownError(error)))
             }
@@ -207,12 +194,20 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         
         switch channel {
         case .websocket(let wsChannel):
-            do {
-                try await wsChannel.executeThenClose { _, outbound in
-                    try await outbound.write(pingFrame)
+            try await wsChannel.executeThenClose { inbound, outbound in
+                try await outbound.write(pingFrame)
+                
+                for try await pong in inbound {
+                    switch pong.opcode {
+                    case .pong:
+                        print("Pong Received: \(String(buffer: pong.data))")
+                    case .binary:
+                        onReceive(pong.data)
+                    default:
+                        messageReceivedSubject.send(completion: .failure(.dataNotSuported))
+                        return
+                    }
                 }
-            } catch {
-                messageReceivedSubject.send(completion: .failure(.unknownError(error)))
             }
         case .notUpgraded:
             messageReceivedSubject.send(completion: .failure(.noConnection))
@@ -227,9 +222,26 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         
         guard let wsUpgrader else { throw WebSocketError.noConnection }
         
-        guard let outboundWriter else { return }
+        let channel = try await wsUpgrader.get()
         
-        try await outboundWriter.write(messageFrame)
+        switch channel {
+        case .websocket(let wsChannel):
+            try await wsChannel.executeThenClose { inbound, outbound in
+                try await outbound.write(messageFrame)
+                
+                for try await message in inbound {
+                    switch message.opcode {
+                    case .binary:
+                        onReceive(message.data)
+                    default:
+                        messageReceivedSubject.send(completion: .failure(.dataNotSuported))
+                        return
+                    }
+                }
+            }
+        case .notUpgraded:
+            messageReceivedSubject.send(completion: .failure(.noConnection))
+        }
     }
     
     public init(
