@@ -106,6 +106,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         case .websocket(let wsChannel):
             print("Handling websocket connection")
             try await handleWebsocketChannel(wsChannel, and: initialMessage)
+            try await receiveValues(with: wsChannel)
             print("Done handling websocket connection")
         case .notUpgraded:
             print("Upgrade declined")
@@ -130,9 +131,16 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         let message = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: [UInt8](modelData)))
         
         // Executes the channel.
-        try await channel.executeThenClose { inbound, outbound in
+        try await channel.executeThenClose { _, outbound in
             // Sends the initial message for the channel.
             try await outbound.write(message)
+        }
+    }
+    
+    private func receiveValues(
+        with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
+    ) async throws {
+        try await channel.executeThenClose { inbound, outbound in
             
             // Creates a stream for receive
             // the all data that coming
@@ -215,8 +223,9 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         
         switch channel {
         case .websocket(let wsChannel):
-            try await wsChannel.executeThenClose { _, outbound in
+            try await wsChannel.executeThenClose { inbound, outbound in
                 try await outbound.write(messageFrame)
+                
             }
         case .notUpgraded:
             throw WebSocketError.noConnection
