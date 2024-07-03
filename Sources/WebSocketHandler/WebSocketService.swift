@@ -97,7 +97,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    public func handleUpgradeResult<M: Codable>(
+    public func channelUpgradeResult<M: Codable>(
         with initialMessage: M
     ) async throws {
         guard let wsUpgrader else { return }
