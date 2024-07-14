@@ -155,6 +155,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                     print("Pong Received: \(String(buffer: frame.data))")
                 default:
                     print("Message received isn't valid.")
+                    try await disconnect()
                     break
                 }
             }
