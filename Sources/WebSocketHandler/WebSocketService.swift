@@ -148,6 +148,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
             // the all data that coming
             // from the WebSocket channel.
             for try await frame in inbound {
+                print(frame.opcode)
                 switch frame.opcode {
                 case .binary:
                     onReceive(frame.data)
