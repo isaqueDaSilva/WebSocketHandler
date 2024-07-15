@@ -152,7 +152,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                 switch frame.opcode {
                 case .binary:
                     onReceive(frame.data)
-                case .ping:
+                case .pong:
                     print("Connection alive with: \(String(buffer: frame.data))")
                 default:
                     print("Message received isn't valid")
