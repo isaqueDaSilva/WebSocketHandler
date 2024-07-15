@@ -151,8 +151,8 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                 switch frame.opcode {
                 case .binary:
                     onReceive(frame.data)
-                case .pong:
-                    print("Pong Received: \(String(buffer: frame.data))")
+                case .ping:
+                    print("Connection alive with: \(String(buffer: frame.data))")
                 default:
                     print("Message received isn't valid.")
                     try await disconnect()
