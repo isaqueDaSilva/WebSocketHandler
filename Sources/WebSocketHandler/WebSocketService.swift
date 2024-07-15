@@ -154,7 +154,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                 case .ping:
                     print("Connection alive with: \(String(buffer: frame.data))")
                 default:
-                    print("Message received isn't valid.")
+                    print("Message received isn't valid. Message: \(String(buffer: frame.data))")
                     try await disconnect()
                     break
                 }
