@@ -198,10 +198,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     public mutating func sendPing() async throws {
         let pingFrame = WebSocketFrame(fin: true, opcode: .ping, data: .init(string: "I'm here."))
         
-        guard wsUpgrader != nil else {
-            messageReceivedSubject.send(completion: .failure(.noConnection))
-            return
-        }
+        guard wsUpgrader != nil else { return }
         
         guard let outboundWriter else {
             messageReceivedSubject.send(completion: .failure(.noConnection))
