@@ -154,7 +154,11 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
                 case .ping:
                     print("Connection alive with: \(String(buffer: frame.data))")
                 default:
-                    print("Message received isn't valid. Message: \(String(buffer: frame.data))")
+                    guard let message = try? JSONDecoder().decode(ReceiveMessage.self, from: frame.data) else {
+                        return
+                    }
+                    print("Message received isn't valid")
+                    dump(message)
                     try await disconnect()
                     break
                 }
