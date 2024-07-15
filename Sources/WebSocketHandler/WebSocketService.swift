@@ -148,18 +148,13 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
             // the all data that coming
             // from the WebSocket channel.
             for try await frame in inbound {
-                print(frame.opcode)
                 switch frame.opcode {
                 case .binary:
                     onReceive(frame.data)
                 case .ping:
                     print("Connection alive with: \(String(buffer: frame.data))")
                 default:
-                    guard let message = try? JSONDecoder().decode(ReceiveMessage.self, from: frame.data) else {
-                        return
-                    }
                     print("Message received isn't valid")
-                    dump(message)
                     try await disconnect()
                     break
                 }
