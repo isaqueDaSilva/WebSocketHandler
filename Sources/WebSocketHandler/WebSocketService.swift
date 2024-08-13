@@ -39,9 +39,9 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
     /// Starts the WebSocket channel
-    public mutating func start() async throws {
+    public mutating func start<M: Codable>(with initialMessage: M) async throws {
         self.wsUpgrader = try await getUpgraderResult()
-        try await self.upgradeChannel()
+        try await self.upgradeChannel(with: initialMessage)
     }
     
     /// Establish the WebSoclet channel connection
@@ -96,10 +96,8 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     }
     
     /// Handles with the upgrade result.
-    /// - Parameters:
-    ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
-    ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private mutating func upgradeChannel() async throws {
+    /// - Parameter initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
+    private mutating func upgradeChannel<M: Codable>(with initialMessage: M) async throws {
         guard let wsUpgrader else {
             return try await disconnect()
         }
@@ -107,7 +105,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
             print("Handling websocket connection...")
-            try await handleWebsocketChannel(with: wsChannel)
+            try await handleWebsocketChannel(with: wsChannel, and: initialMessage)
             try await disconnect()
             print("Done handling websocket connection.")
         case .notUpgraded:
@@ -119,13 +117,17 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - channel: The actual WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private mutating func handleWebsocketChannel(
-        with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
+    private mutating func handleWebsocketChannel<M: Codable>(
+        with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
+        and initialMessage: M
     ) async throws {
-        
         // Executes the channel.
         try await channel.executeThenClose { inbound, outbound in
             outboundWriter = outbound
+            
+            let data = try JSONEncoder().encode(initialMessage)
+            
+            try await self.send(data)
             
             // Creates a stream for receive
             // the all data that coming
@@ -199,9 +201,6 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// Sends a message for the WebSocket channel
     /// - Parameter message: The message data representation for send to the channel.
     public mutating func send(_ message: Data) async throws {
-        let messageByte = [UInt8](message)
-        let messageFrame = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: messageByte))
-        
         guard wsUpgrader != nil else { return }
         
         guard let outboundWriter else {
@@ -209,6 +208,9 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
             try await disconnect()
             return
         }
+        
+        let messageByte = [UInt8](message)
+        let messageFrame = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: messageByte))
         
         do {
             try await outboundWriter.write(messageFrame)
