@@ -41,12 +41,6 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// Starts the WebSocket channel
     public mutating func start<M: Codable>(with initialMessage: M) async throws {
         self.wsUpgrader = try await getUpgraderResult()
-        
-        guard let wsUpgrader else {
-            return try await disconnect()
-        }
-        
-        try await channelUpgradeResult(with: wsUpgrader, and: initialMessage)
     }
     
     /// Establish the WebSoclet channel connection
@@ -104,11 +98,14 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private mutating func channelUpgradeResult<M: Codable>(
-        with upgrader: EventLoopFuture<UpgradeResult>,
-        and initialMessage: M
+    public mutating func upgradeChannel<M: Codable>(
+        with initialMessage: M
     ) async throws {
-        switch try await upgrader.get() {
+        guard let wsUpgrader else {
+            return try await disconnect()
+        }
+        
+        switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
             print("Handling websocket connection")
             try await handleWebsocketChannel(wsChannel, and: initialMessage)
