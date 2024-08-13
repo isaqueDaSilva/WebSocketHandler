@@ -39,7 +39,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
     /// Starts the WebSocket channel
-    public mutating func start<M: Codable>(with initialMessage: M) async throws {
+    public mutating func start() async throws {
         self.wsUpgrader = try await getUpgraderResult()
     }
     
