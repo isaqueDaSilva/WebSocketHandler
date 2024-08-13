@@ -107,12 +107,12 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
         
         switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
-            print("Handling websocket connection")
+            print("Handling websocket connection...")
             try await handleWebsocketChannel(wsChannel, and: initialMessage)
             try await disconnect()
-            print("Done handling websocket connection")
+            print("Done handling websocket connection.")
         case .notUpgraded:
-            print("Upgrade declined")
+            print("Upgrade declined.")
         }
     }
     
