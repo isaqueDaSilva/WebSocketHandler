@@ -6,7 +6,7 @@
 //
 
 import Foundation
-//
+
 extension WebSocketService: Error, LocalizedError {
     /// An error collection that may occur when execution the WebSocket channel.
     public enum WebSocketError: Error, LocalizedError, Sendable {
