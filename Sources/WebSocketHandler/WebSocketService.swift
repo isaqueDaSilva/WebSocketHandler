@@ -41,6 +41,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// Starts the WebSocket channel
     public mutating func start() async throws {
         self.wsUpgrader = try await getUpgraderResult()
+        try await self.upgradeChannel()
     }
     
     /// Establish the WebSoclet channel connection
@@ -98,21 +99,19 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - upgradeResult: An `EventLoopFuture` that stores the status of the WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    public mutating func upgradeChannel<M: Codable>(
-        with initialMessage: M
-    ) async throws {
+    public mutating func upgradeChannel() async throws {
         guard let wsUpgrader else {
             return try await disconnect()
         }
         
         switch try await wsUpgrader.get() {
         case .websocket(let wsChannel):
-            print("Handling websocket connection")
-            try await handleWebsocketChannel(wsChannel, and: initialMessage)
+            print("Handling websocket connection...")
+            try await handleWebsocketChannel(with: wsChannel)
             try await disconnect()
-            print("Done handling websocket connection")
+            print("Done handling websocket connection.")
         case .notUpgraded:
-            print("Upgrade declined")
+            print("Upgrade declined.")
         }
     }
     
@@ -120,27 +119,13 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     /// - Parameters:
     ///   - channel: The actual WebSocket channel.
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private mutating func handleWebsocketChannel<M: Codable>(
-        _ channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
-        and initialMessage: M
+    private mutating func handleWebsocketChannel(
+        with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>
     ) async throws {
-        let encoder = JSONEncoder()
-        
-        // Encodes the message for send in the channel.
-        let modelData = try encoder.encode(initialMessage)
-        
-        // Transform the data in an actual WebSocketFrame model
-        // for send in the channel.
-        let message = WebSocketFrame(fin: true, opcode: .binary, data: .init(bytes: [UInt8](modelData)))
         
         // Executes the channel.
         try await channel.executeThenClose { inbound, outbound in
             outboundWriter = outbound
-            
-            // Sends the initial message for the channel.
-            guard let outboundWriter else { return }
-            
-            try await outboundWriter.write(message)
             
             // Creates a stream for receive
             // the all data that coming
