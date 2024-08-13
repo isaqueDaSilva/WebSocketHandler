@@ -39,7 +39,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     public let messageReceivedSubject: PassthroughSubject<ReceiveMessage, WebSocketError>
     
     /// Starts the WebSocket channel
-    public mutating func start<M: Codable>(with initialMessage: M) async throws {
+    public mutating func start<M: Codable>(with initialMessage: M? = nil) async throws {
         self.wsUpgrader = try await getUpgraderResult()
         try await self.upgradeChannel(with: initialMessage)
     }
@@ -97,7 +97,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Handles with the upgrade result.
     /// - Parameter initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
-    private mutating func upgradeChannel<M: Codable>(with initialMessage: M) async throws {
+    private mutating func upgradeChannel<M: Codable>(with initialMessage: M?) async throws {
         guard let wsUpgrader else {
             return try await disconnect()
         }
@@ -119,15 +119,17 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     ///   - initialMessage: An initial message object for send to the WebSocket channel for starts the connection.
     private mutating func handleWebsocketChannel<M: Codable>(
         with channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>,
-        and initialMessage: M
+        and initialMessage: M?
     ) async throws {
         // Executes the channel.
         try await channel.executeThenClose { inbound, outbound in
             outboundWriter = outbound
             
-            let data = try JSONEncoder().encode(initialMessage)
-            
-            try await self.send(data)
+            if let initialMessage {
+                let data = try JSONEncoder().encode(initialMessage)
+                
+                try await self.send(data)
+            }
             
             // Creates a stream for receive
             // the all data that coming
