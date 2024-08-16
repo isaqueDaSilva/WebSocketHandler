@@ -153,7 +153,10 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
     
     /// Disconnect the active channel.
     /// - Parameter closeMode: What kind of close operation is requested.
-    public mutating func disconnect(with closeMode: CloseMode = .all) async throws {
+    public mutating func disconnect(
+        with closeMode: CloseMode = .all,
+        and finishType: Subscribers.Completion<WebSocketError> = .finished
+    ) async throws {
         guard let wsUpgrader else { return }
         
         switch try await wsUpgrader.get() {
@@ -164,7 +167,7 @@ public struct WebSocketService<ReceiveMessage: Decodable> {
             } catch {
                 messageReceivedSubject.send(completion: .failure(.unknownError(error)))
             }
-            messageReceivedSubject.send(completion: .finished)
+            messageReceivedSubject.send(completion: finishType)
         case .notUpgraded:
             return
         }
